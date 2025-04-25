@@ -1,0 +1,146 @@
+#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+
+#define MAX 10
+
+char productions[MAX][10];
+char nonTerminals[MAX];
+int numProductions = 0;
+int numNonTerminals = 0;
+
+struct First {
+    char symbol;
+    char firstSet[MAX];
+    int count;
+} first[MAX];
+
+struct Follow {
+    char symbol;
+    char followSet[MAX];
+    int count;
+} follow[MAX];
+
+void addToSet(char *set, int *count, char value) {
+    for (int i = 0; i < *count; i++) {
+        if (set[i] == value)
+            return;
+    }
+    set[(*count)++] = value;
+}
+
+int isNonTerminal(char symbol) {
+    return symbol >= 'A' && symbol <= 'Z';
+}
+
+void findFirst(char symbol, int index) {
+    for (int i = 0; i < numProductions; i++) {
+        if (productions[i][0] == symbol) {
+            char next = productions[i][3];
+            if (isNonTerminal(next)) {
+                findFirst(next, index);
+            } else {
+                addToSet(first[index].firstSet, &first[index].count, next);
+            }
+        }
+    }
+}
+
+void findFollow(char symbol, int index) {
+    if (index == 0) {
+        addToSet(follow[index].followSet, &follow[index].count, '$');  // Start symbol
+    }
+
+    for (int i = 0; i < numProductions; i++) {
+        int len = strlen(productions[i]);
+        for (int j = 3; j < len; j++) {
+            if (productions[i][j] == symbol) {
+                if (j + 1 < len) {
+                    char next = productions[i][j + 1];
+                    if (isNonTerminal(next)) {
+                        for (int k = 0; k < numNonTerminals; k++) {
+                            if (first[k].symbol == next) {
+                                for (int l = 0; l < first[k].count; l++) {
+                                    addToSet(follow[index].followSet, &follow[index].count, first[k].firstSet[l]);
+                                }
+                                break;
+                            }
+                        }
+                    } else {
+                        addToSet(follow[index].followSet, &follow[index].count, next);
+                    }
+                } else if (productions[i][0] != symbol) {
+                    for (int k = 0; k < numNonTerminals; k++) {
+                        if (follow[k].symbol == productions[i][0]) {
+                            for (int l = 0; l < follow[k].count; l++) {
+                                addToSet(follow[index].followSet, &follow[index].count, follow[k].followSet[l]);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    printf("Enter number of productions: ");
+    scanf("%d", &numProductions);
+
+    printf("Enter productions (e.g., A->aB):\n");
+    for (int i = 0; i < numProductions; i++) {
+        scanf("%s", productions[i]);
+    }
+
+    // Extract non-terminals
+    for (int i = 0; i < numProductions; i++) {
+        char nt = productions[i][0];
+        int exists = 0;
+        for (int j = 0; j < numNonTerminals; j++) {
+            if (nonTerminals[j] == nt) {
+                exists = 1;
+                break;
+            }
+        }
+        if (!exists) {
+            nonTerminals[numNonTerminals++] = nt;
+        }
+    }
+
+    // Calculate First sets
+    for (int i = 0; i < numNonTerminals; i++) {
+        first[i].symbol = nonTerminals[i];
+        first[i].count = 0;
+        findFirst(nonTerminals[i], i);
+    }
+
+    // Calculate Follow sets
+    for (int i = 0; i < numNonTerminals; i++) {
+        follow[i].symbol = nonTerminals[i];
+        follow[i].count = 0;
+        findFollow(nonTerminals[i], i);
+    }
+
+    // Display First sets
+    printf("\nFIRST Sets:\n");
+    for (int i = 0; i < numNonTerminals; i++) {
+        printf("First(%c) = { ", first[i].symbol);
+        for (int j = 0; j < first[i].count; j++) {
+            printf("%c ", first[i].firstSet[j]);
+        }
+        printf("}\n");
+    }
+
+    // Display Follow sets
+    printf("\nFOLLOW Sets:\n");
+    for (int i = 0; i < numNonTerminals; i++) {
+        printf("Follow(%c) = { ", follow[i].symbol);
+        for (int j = 0; j < follow[i].count; j++) {
+            printf("%c ", follow[i].followSet[j]);
+        }
+        printf("}\n");
+    }
+
+    return 0;
+}
